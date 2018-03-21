@@ -21,7 +21,6 @@ class Option(object):
         """ Optional parameters used by derived classes """
         self.sigma = params.get("sigma", 0)  # Volatility
         self.is_call = params.get("is_call", True)  # Call or put
-        self.is_european = params.get("is_eu", True)  # Eu or Am
         
         """ Computed values """
         self.dt = T/float(N)  # Single time step, in years
