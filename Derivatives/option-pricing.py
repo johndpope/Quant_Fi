@@ -76,8 +76,8 @@ class EuropeanCRR(Option):
 
 
 
-eu_opt = EuropeanCRR(50, 50, 0.1, 0.4167, 1000, {"sigma":0.4, "is_call": False})
+eu_opt = EuropeanCRR(50, 50, 0.1, 0.4167, 10000, {"sigma":0.4, "is_call": False})
 tic = time.time()
 print(eu_opt.price())
 tac = time.time()
-print("Exec time: {:.4f}s".format((tac-tic)))
+print("Exec time: {:.10f}s".format((tac-tic)))
