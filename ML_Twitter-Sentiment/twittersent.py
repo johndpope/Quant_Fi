@@ -67,7 +67,7 @@ while True:
         auth = OAuthHandler(ckey, csecret)
         auth.set_access_token(atoken, asecret)
         twitterStream = Stream(auth, listener())
-        twitterStream.filter(track=["TPMP", "#TPMP"])
+        twitterStream.filter(track=["#WorldWaterDay", "WorldWaterDay"])
     except Exception as e:
         print(str(e))
         time.sleep(5)
