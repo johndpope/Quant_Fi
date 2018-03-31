@@ -9,6 +9,7 @@ import time
 import math
 import numpy as np
 from scipy import stats
+from numba import jit
 
 class EuropeanOption(object):
     def __init__(self, S0, K, r, T, sigma, is_call):
@@ -44,7 +45,7 @@ class MonteCarloVanilla(EuropeanOption):
         
     def _termvalues_(self):
         """Vectorized Weiner Process"""
-        X = X = np.random.randn(self.niter)
+        X = np.random.randn(self.niter)
         return self.S0 * np.exp( (self.r- (self.sigma**2) / 2)*self.T \
                                 + self.sigma *math.sqrt(self.T) * X)
 
@@ -71,17 +72,21 @@ class MonteCarloAsian(MonteCarloVanilla):
         super().__init__(S0, K, r, T, sigma, div, is_call, niter)
         self.nsteps = nsteps
         self.STs = None
+        
     
     def _termvalues_(self):
         """Calculate the arithmetic average price of the paths"""
         self.dt = self.T / self.nsteps
         self.STs = np.full((self.niter, self.nsteps), self.S0, dtype=np.float32)
         for i in range(self.nsteps):
-            X = np.random.randn(self.niter)
+            """Antithetic variable for Variance reduction and speed"""
+            X = np.random.randn(int(self.niter/2))
+            X = np.concatenate((X, -X), axis=0)
             self.STs[:,i] = self.STs[:,i-1] * np.exp( (self.r- (self.sigma**2) / 2)*self.dt \
                     + self.sigma*np.sqrt(self.dt) * X)
         self.STs = self.STs.mean(axis=1)
         return self.STs
+    
     
 class BinomCRR(EuropeanOption):
     """Cox-Ross-Rubinstein European option valuation."""
@@ -142,9 +147,9 @@ class BinomCRR(EuropeanOption):
 #Option = BlackScholes(50, 50, 0.1, 0.4167, 0.4, 0, 1)
 #Option = MonteCarloVanilla(50, 50, 0.1, 0.4167, 0.4, 0, 1, 100000)
 #Option = MonteCarloDigitale(50, 50, 0.1, 0.4167, 0.4, 0, 1, 100000)
-#Option = MonteCarloAsian(40, 40, 0.05, 0.5, 0.4, 0, 1, 10000, 1000)
+Option = MonteCarloAsian(100, 120, 0.05, 1, 0.3, 0, 1, 100000, 1000)
 
 tic = time.time()
-#print(Option.value())
+print(Option.value())
 tac = time.time()
 print("Exec time: {:.10f}s".format((tac-tic)))
