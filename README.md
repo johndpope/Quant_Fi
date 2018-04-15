@@ -1,4 +1,4 @@
-![Picture](doc/banner.png?raw=true)
+![Picture](doc/banner-git.png?raw=true)
 
 ---
 
