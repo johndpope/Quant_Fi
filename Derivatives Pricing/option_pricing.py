@@ -9,7 +9,6 @@ import time
 import math
 import numpy as np
 from scipy import stats
-from numba import jit
 
 class EuropeanOption(object):
     def __init__(self, S0, K, r, T, sigma, is_call):
@@ -26,17 +25,29 @@ class BlackScholes(EuropeanOption):
         self.div = div
 
     def __setup_parameters__(self):        
-        d1 = ( math.log(self.S0 / self.K) + (self.r - self.div +0.5*math.pow(self.sigma,2)) *self.T) \
+        self.d1 = ( math.log(self.S0 / self.K) + (self.r - self.div +0.5*math.pow(self.sigma,2)) *self.T) \
         / (self.sigma*math.sqrt(self.T))
-        d2 = d1 - self.sigma*math.sqrt(self.T)
-        self.Nd1 = stats.norm.cdf(self.is_call * d1)
-        self.Nd2 = stats.norm.cdf(self.is_call * d2)
+        self.d2 = self.d1 - self.sigma*math.sqrt(self.T)
+        self.Nd1 = stats.norm.cdf(self.is_call * self.d1)
+        self.Nd2 = stats.norm.cdf(self.is_call * self.d2)
     
     def value(self):
         self.__setup_parameters__()
         value = self.is_call * self.S0 * math.exp(-self.div * self.T)*self.Nd1 \
                 - self.is_call*self.K*math.exp(-self.r*self.T)*self.Nd2 
         return value
+
+    def delta(self):
+        self.__setup_parameters__()
+        if self.is_call == 1:
+            delta = math.exp(-self.div * self.T) * self.Nd1
+        else:
+            delta = math.exp(-self.div * self.T) * (self.Nd1 - 1)
+        return delta
+
+    def gamma(self):
+        self.__setup_parameters__()
+        return math.exp(-self.div * self.T) * stats.norm.pdf(self.d1) / (self.S0 * self.sigma * math.sqrt(self.T))
 
 class MonteCarloVanilla(EuropeanOption):
     def __init__(self, S0, K, r, T, sigma, div, is_call, niter):
@@ -86,7 +97,27 @@ class MonteCarloAsian(MonteCarloVanilla):
                     + self.sigma*np.sqrt(self.dt) * X)
         self.STs = self.STs.mean(axis=1)
         return self.STs
-    
+
+class MonteCarloUpOut(MonteCarloVanilla):
+    def __init__(self, S0, K, r, T, sigma, div, is_call, niter, nsteps, barrier):
+        super().__init__(S0, K, r, T, sigma, div, is_call, niter)
+        self.nsteps = nsteps
+        self.barrier = barrier
+        self.STs = None
+        self.SBs = None
+
+    def _termvalues_(self):
+        """Calculate the arithmetic average price of the paths"""
+        self.dt = self.T / self.nsteps
+        self.STs = np.full((self.niter, self.nsteps), self.S0, dtype=np.float32)
+        for i in range(self.nsteps):
+            X = np.random.randn(int(self.niter/2))
+            X = np.concatenate((X, -X), axis=0)
+            self.STs[:,i] = self.STs[:,i-1] * np.exp( (self.r- (self.sigma**2) / 2)*self.dt \
+                    + self.sigma*np.sqrt(self.dt) * X)
+            self.SBs = np.where(self.STs <= self.barrier, True, False)
+        self.STs = self.STs[:,-1] * self.SBs.all(axis=1)
+        return self.STs
     
 class BinomCRR(EuropeanOption):
     """Cox-Ross-Rubinstein European option valuation."""
@@ -143,13 +174,18 @@ class BinomCRR(EuropeanOption):
 
 
 
+
 #Option = BinomCRR(50, 50, 0.1, 0.4167, 0.4, 1, 10000)
-#Option = BlackScholes(50, 50, 0.1, 0.4167, 0.4, 0, 1)
+Option = BlackScholes(50, 50, 0.1, 0.4167, 0.4, 0, 1)
 #Option = MonteCarloVanilla(50, 50, 0.1, 0.4167, 0.4, 0, 1, 100000)
 #Option = MonteCarloDigitale(50, 50, 0.1, 0.4167, 0.4, 0, 1, 100000)
-Option = MonteCarloAsian(100, 120, 0.05, 1, 0.3, 0, 1, 100000, 1000)
+#Option = MonteCarloAsian(100, 120, 0.05, 1, 0.3, 0, 1, 100000, 1000)
+#Option = MonteCarloUpOut(100, 100, 0.05, 0.5, 0.2, 0, 1, 100000, 100, 120)
+
 
 tic = time.time()
 print(Option.value())
+print(Option.delta())
+print(Option.gamma())
 tac = time.time()
 print("Exec time: {:.10f}s".format((tac-tic)))
